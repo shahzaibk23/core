@@ -1,0 +1,6 @@
+❯ verilator --version
+Verilator 5.012 2023-06-13 rev UNKNOWN.REV
+
+❯ sbt --version
+sbt version in this project: 1.9.7
+sbt script version: 1.9.7
