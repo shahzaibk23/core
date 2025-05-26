@@ -8,17 +8,76 @@ import chisel3.util._
 
 import common.{Component, MemRequestIO, MemResponseIO}
 
-class SRamTop_IO(dw:Int) extends Bundle
+class SRamTop_IO(dw:Int, mw:Int) extends Bundle
 {
-    val req: DecoupledIO[MemRequestIO]   = Flipped(Decoupled(new MemRequestIO(dw)))
+    val req: DecoupledIO[MemRequestIO]   = Flipped(Decoupled(new MemRequestIO(dw, mw)))
     val rsp: DecoupledIO[MemResponseIO]  = Decoupled(new MemResponseIO(dw))
 }
 
-class SRamTop(programFile: Option[String]) extends Component
+class SRamTopUno(programFile: Option[String]) extends Component
 {
-    val dataWidth = config.ISA
+    // ASSUMPTION: To be used only for IMEM
+    val dataWidth: Int = 32 //config.ISA
+    val mem_width: Int = log2Ceil(config.ImemSize)
 
-    val io = IO(new SRamTop_IO(dataWidth))
+    val io = IO(new SRamTop_IO(dataWidth, mem_width))
+
+    val validReg = RegInit(0.B)
+    io.rsp.valid := validReg
+    io.req.ready := 1.B
+
+    val rdata    = Wire(UInt(dataWidth.W))
+
+    val sram = Module(new sram_top(programFile))
+
+    val clk = WireInit(clock)
+    val rst = Wire(Bool())
+    rst     := reset
+
+    sram.io.clk_i   := clk
+    sram.io.rst_i   := rst
+    sram.io.csb_i   := 1.B
+    sram.io.we_i    := DontCare
+    sram.io.wmask_i := DontCare
+    sram.io.addr_i  := DontCare
+    sram.io.wdata_i := DontCare
+
+    rdata := DontCare
+
+    when(io.req.valid)
+    {
+        validReg := 1.B
+
+        when (io.req.bits.isWrite)
+        {
+            sram.io.csb_i   := 0.B
+            sram.io.we_i    := 0.B
+            sram.io.addr_i  := io.req.bits.addrRequest
+            sram.io.wmask_i := io.req.bits.activeByteLane
+            sram.io.wdata_i := io.req.bits.dataRequest
+
+            rdata := DontCare
+        }
+        .otherwise
+        {
+            sram.io.csb_i   := 0.B
+            sram.io.we_i    := 1.B
+            sram.io.addr_i  := io.req.bits.addrRequest
+
+            rdata := sram.io.rdata_o
+        }
+    }
+
+    io.rsp.bits.dataResponse    := sram.io.rdata_o
+    io.rsp.bits.error           := 0.B
+}
+
+class SRamTopDuo(programFile: Option[String]) extends Component
+{
+    val dataWidth: Int = config.ISA
+    val mem_width: Int = log2Ceil(config.ImemSize)
+
+    val io = IO(new SRamTop_IO(dataWidth, mem_width))
 
     val validReg = RegInit(0.B)
     io.rsp.valid := validReg
@@ -50,8 +109,8 @@ class SRamTop(programFile: Option[String]) extends Component
     fileOut1.close()
 
 
-    val sram_0    = Module(new sram_top(Some("sram_0.hex")))
-    val sram_1    = Module(new sram_top(Some("sram_1.hex")))
+    val sram_0    = Module(new sram_top(Some("/Users/shahzaibkashif/core/sram_0.hex"))) // TODO: Find a way to provide absolute path
+    val sram_1    = Module(new sram_top(Some("/Users/shahzaibkashif/core/sram_1.hex")))
 
     val clk       = WireInit(clock)
     val rst       = Wire(Bool())
