@@ -35,16 +35,28 @@ object AluSrc1 extends ChiselEnum
     val rs1, pc, zero   = Value
 }
 
-class ControlSignals extends Bundle{
-    val aluSrc:     Bool        = Bool()
-    val memToReg:   MemToReg.Type    = MemToReg.Type()
-    val regWrite:   Bool        = Bool()
-    val memRead:    Bool        = Bool()
-    val memWrite:   Bool        = Bool()
-    val branch:     Bool        = Bool()
-    val jump:       JumpType.Type    = JumpType.Type()
-    val aluOp:      UInt        = UInt(2.W)
-    val aluSrc1:    AluSrc1.Type     = AluSrc1.Type()
+trait ControlSignals_ALU extends Bundle
+{
+    val aluSrc:     Bool                = Bool()
+    val aluOp:      UInt                = UInt(2.W)
+    val aluSrc1:    AluSrc1.Type        = AluSrc1.Type()
+}
+
+class ControlSignals_MEM_WB extends Bundle
+{
+    val memToReg:   MemToReg.Type       = MemToReg.Type()
+    val regWrite:   Bool                = Bool()
+}
+
+class ControlSignals_EX_MEM extends ControlSignals_MEM_WB
+{
+    val memRead:    Bool                = Bool()
+    val memWrite:   Bool                = Bool()
+    val branch:     Bool                = Bool()
+}
+
+class ControlSignals extends ControlSignals_EX_MEM with ControlSignals_ALU{
+    val jump:       JumpType.Type       = JumpType.Type()
 }
 
 class Control_IO extends Bundle{
@@ -61,17 +73,6 @@ class Control extends Component
 
     val controlTable     = Array(
         RType      -> ControlSignalsLit(
-            aluSrc      = 0.B,
-            memToReg    = MemToReg.alu,
-            regWrite    = 1.B,
-            memRead     = 0.B,
-            memWrite    = 0.B,
-            branch      = 0.B,
-            jump        = JumpType.none,
-            aluOp       = "b10".U,
-            aluSrc1     = AluSrc1.rs1         
-        ),
-        IType      -> ControlSignalsLit(
             aluSrc      = 1.B,
             memToReg    = MemToReg.alu,
             regWrite    = 1.B,
@@ -79,7 +80,18 @@ class Control extends Component
             memWrite    = 0.B,
             branch      = 0.B,
             jump        = JumpType.none,
-            aluOp       = "b10".U,
+            aluOp       = "b00".U,
+            aluSrc1     = AluSrc1.rs1         
+        ),
+        IType      -> ControlSignalsLit(
+            aluSrc      = 0.B,
+            memToReg    = MemToReg.alu,
+            regWrite    = 1.B,
+            memRead     = 0.B,
+            memWrite    = 0.B,
+            branch      = 0.B,
+            jump        = JumpType.none,
+            aluOp       = "b00".U,
             aluSrc1     = AluSrc1.rs1   
         ),
         InstructionTypes.Load       -> ControlSignalsLit(
