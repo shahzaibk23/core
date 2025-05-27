@@ -95,7 +95,7 @@ class Control extends Component
             aluSrc1     = AluSrc1.rs1   
         ),
         InstructionTypes.Load       -> ControlSignalsLit(
-            aluSrc      = 1.B,
+            aluSrc      = 0.B,
             memToReg    = MemToReg.load,
             regWrite    = 1.B,
             memRead     = 1.B,
@@ -106,7 +106,7 @@ class Control extends Component
             aluSrc1     = AluSrc1.rs1        
         ),
         Store      -> ControlSignalsLit(
-            aluSrc      = 1.B,
+            aluSrc      = 0.B,
             memToReg    = MemToReg.alu,
             regWrite    = 0.B,
             memRead     = 0.B,
