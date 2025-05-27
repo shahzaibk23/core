@@ -5,7 +5,7 @@ import chisel3.util._
 
 import common.Component
 
-import components.{Control, RegisterFile, ImmediateGen}
+import components.{Control, RegisterFile, ImmediateGen, NPC, BranchResolutionUnit}
 
 class InstructionDecodeStage_IO(dw: Int, mw: Int) extends Bundle
 {
@@ -15,6 +15,8 @@ class InstructionDecodeStage_IO(dw: Int, mw: Int) extends Bundle
     val writeReg: UInt = Input(UInt())  // writeback reg
     val writeEnable: Bool = Input(Bool()) // writeback we
     val writeData:  UInt    =Input(UInt(dw.W))  // writeback data
+
+    val npc: ValidIO[UInt] = Valid(UInt(mw.W))
 }
 
 class InstructionDecodeStage extends Component
@@ -47,6 +49,22 @@ class InstructionDecodeStage extends Component
     val immediateGen = Module(new ImmediateGen).io
     immediateGen.instruction := io.if_id.instruction
     io.id_ex.imm := immediateGen.out
+
+    val branchUnit  = Module(new BranchResolutionUnit).io
+    branchUnit.branch   := control.out.branch
+    branchUnit.funct3   := io.if_id.instruction(14, 12)
+    branchUnit.rd1      := regFile.readData(0)
+    branchUnit.rd2      := regFile.readData(1)
+    branchUnit.take_branch := 1.B // TODO: connect w. HDU
+
+    val npc = Module(new NPC).io
+    npc.branch_taken    :=  branchUnit.taken
+    npc.immediate       :=  immediateGen.out
+    npc.rd1             :=  regFile.readData(0)
+    npc.ctrl_jump       :=  control.out.jump
+    npc.pc              := io.if_id.pc
+
+    io.npc  <> npc.npc
 
     io.id_ex.pc     := io.if_id.pc
     io.id_ex.wr_a   := io.if_id.instruction(11, 7)

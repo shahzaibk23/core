@@ -42,6 +42,8 @@ class CoreTop extends Component
 
     ID_stage.if_id  <>  IF_stage.if_id
 
+    IF_stage.npc <> ID_stage.npc
+
     // dummies -- to be del when WB comes
     // ID_stage.writeReg := 0.U
     // ID_stage.writeEnable := 0.B
@@ -69,6 +71,7 @@ class CoreTop extends Component
         load   ->  MEM_stage.mem_wb.mem_readData,
         pc    ->  MEM_stage.mem_wb.pc
     ))
+
 
 
     io.pin := MEM_stage.mem_wb.alu_result

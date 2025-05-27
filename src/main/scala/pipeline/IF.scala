@@ -22,6 +22,8 @@ class InstructionFetchStage_IO(data_width: Int, pc_width: Int) extends Bundle
     // val in  =   Input(new InstructionFetchStage_Ins(pc_width))
     val if_id =   Output(new IF_ID(pc_width))
     val core_out =   new InstructionFetchStage_CoreTop_Out(data_width, pc_width)
+
+    val npc: Valid[UInt] = Flipped(Valid(UInt(pc_width.W)))
 }
 
 class InstructionFetchStage extends Component
@@ -35,7 +37,7 @@ class InstructionFetchStage extends Component
     val IF = Module(new InstructionFetch).io
 
     PC.halt := 0.B // not wired a.t.m
-    PC.in   := PC.pc4
+    PC.in   := Mux(io.npc.valid, io.npc.bits, PC.pc4)
 
     IF.address := PC.in.asUInt
     IF.stall   := 0.B
