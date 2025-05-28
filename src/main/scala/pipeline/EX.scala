@@ -7,6 +7,7 @@ import common.{Component, Utils}
 
 import components.{ALU, ALUControl, ControlSignals_EX_MEM}
 import components.AluSrc1._
+import components.JumpType._
 
 class ExecuteStage_IO(dw: Int, mw: Int) extends Bundle
 {
@@ -30,10 +31,10 @@ class ExecuteStage extends Component
     ALUControl.f3       := io.id_ex.f3
     ALUControl.isWord   := 0.B // hardcode a.t.m
 
-    ALU.input01 := MuxLookup(io.id_ex.control.aluSrc1.asUInt, 0.U) (Seq(
-        rs1.asUInt     ->  io.id_ex.rd1,
-        pc.asUInt     ->  io.id_ex.pc,
-        zero.asUInt   ->  0.U 
+    ALU.input01 := MuxLookup(io.id_ex.control.aluSrc1, 0.U) (Seq(
+        rs1     ->  io.id_ex.rd1,
+        pc     ->  io.id_ex.pc,
+        zero   ->  0.U 
     ))
     ALU.input02 := Mux(io.id_ex.control.aluSrc, io.id_ex.rd2, io.id_ex.imm)
     ALU.aluCtrl := ALUControl.out
@@ -42,7 +43,11 @@ class ExecuteStage extends Component
 
     Utils.copyCommonFields(io.id_ex.control, io.ex_mem.control)
 
-    io.ex_mem.alu_result    :=  ALU.result
+    io.ex_mem.alu_result    :=  MuxLookup(io.id_ex.control.jump, 0.U)(Seq(
+        jal     ->  (io.id_ex.pc + 4.U),
+        jalr    ->  (io.id_ex.pc + 4.U),
+        none    ->  ALU.result
+    ))
     io.ex_mem.write_data    :=  io.id_ex.rd2
     io.ex_mem.wr_a          :=  io.id_ex.wr_a
     io.ex_mem.instruction   :=  io.id_ex.instruction
