@@ -151,7 +151,7 @@ class Control extends Component
         ),
         JAL        -> ControlSignalsLit(
             aluSrc      = 0.B,
-            memToReg    = MemToReg.pc,
+            memToReg    = MemToReg.alu,         // TODO: lookback and verify if its correcty
             regWrite    = 1.B,
             memRead     = 0.B,
             memWrite    = 0.B,
