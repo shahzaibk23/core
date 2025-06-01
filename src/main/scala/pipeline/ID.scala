@@ -17,6 +17,14 @@ class InstructionDecodeStage_IO(dw: Int, mw: Int) extends Bundle
     val writeData:  UInt    =Input(UInt(dw.W))  // writeback data
 
     val npc: ValidIO[UInt] = Valid(UInt(mw.W))
+
+    val HDU_takeBranch: Bool = Input(Bool())
+
+    // val branchTaken: Bool = Output(Bool())
+    // val ctrlBranch: Bool    =   Output(Bool())
+
+    // For HDU
+    // val dmemRespValid: Bool = Input(Bool())
 }
 
 class InstructionDecodeStage extends Component
@@ -25,6 +33,10 @@ class InstructionDecodeStage extends Component
     val imemWidth: Int = log2Ceil(config.ImemSize)
 
     val io = IO(new InstructionDecodeStage_IO(dataWidth, imemWidth))
+
+    // val HDU = Module(new HazardDetectionUnit).io
+    // HDU.dmemRespValid   :=  io.dmemRespValid
+    // HDU.ID_EX_memRead   := 
 
     val control = Module(new Control).io
     control.in  <> io.if_id.instruction
@@ -36,6 +48,8 @@ class InstructionDecodeStage extends Component
     val registerRd  = io.writeReg
     val registerRs1 = io.if_id.instruction(19, 15)
     val registerRs2 = io.if_id.instruction(24, 20)
+    dontTouch(registerRs1)
+    dontTouch(registerRs2)
 
     regFile.readAddress(0) := registerRs1
     regFile.readAddress(1) := registerRs2
@@ -55,7 +69,8 @@ class InstructionDecodeStage extends Component
     branchUnit.funct3   := io.if_id.instruction(14, 12)
     branchUnit.rd1      := regFile.readData(0)
     branchUnit.rd2      := regFile.readData(1)
-    branchUnit.take_branch := 1.B // TODO: connect w. HDU
+    branchUnit.take_branch := io.HDU_takeBranch //1.B // TODO: connect w. HDU
+    io.id_ex.branchTaken      := branchUnit.taken
 
     val npc = Module(new NPC).io
     npc.branch_taken    :=  branchUnit.taken
