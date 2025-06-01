@@ -5,7 +5,7 @@ import chisel3.util._
 
 import common.{Component, MemRequestIO, MemResponseIO}
 
-import pipeline.{InstructionFetchStage, InstructionDecodeStage, ExecuteStage, MemoryStage, IF_ID, ID_EX, EX_MEM, MEM_WB}
+import pipeline.{InstructionFetchStage, InstructionDecodeStage, ExecuteStage, MemoryStage, IF_ID, ID_EX, EX_MEM, MEM_WB, HazardDetectionUnit, ForwarderUnit}
 
 import components.MemToReg._
 
@@ -34,24 +34,66 @@ class CoreTop extends Component
     val EX_MEM_pipe =   Reg(new EX_MEM(dataWidth, imemWidth))
     val MEM_WB_pipe =   Reg(new MEM_WB(dataWidth, imemWidth))
 
-    /******** Instruction Fetch Stage ********/
+    val HDU = Module(new HazardDetectionUnit).io
 
     val IF_stage = Module(new InstructionFetchStage).io
+    val ID_stage = Module(new InstructionDecodeStage).io
+    val EX_stage = Module(new ExecuteStage).io
+    val MEM_stage = Module(new MemoryStage).io
+    /******** Instruction Fetch Stage ********/
 
     io.imemReq                  <> IF_stage.core_out.imemReq
     IF_stage.core_out.imemRsp   <> io.imemRsp
 
-    IF_ID_pipe <> IF_stage.if_id
+    when(HDU.IF_regWrite)
+    {IF_ID_pipe <> IF_stage.if_id}
+
+    // IF_ID_pipe <> Mux(HDU.IF_regWrite, IF_stage.if_id, 0.U.asTypeOf(new IF_ID(imemWidth)))
+
+    when(HDU.IF_ID_flush)
+    {IF_ID_pipe.instruction := 0.U}
 
     /******** Instruction Decode Stage ********/
 
-    val ID_stage = Module(new InstructionDecodeStage).io
-
     ID_stage.if_id  <>  IF_ID_pipe  //IF_stage.if_id
-
+    
     IF_stage.npc <> ID_stage.npc
 
+    ID_stage.HDU_takeBranch := HDU.takeBranch
+
+    HDU.ID_EX_memRead   :=  ID_EX_pipe.control.memRead
+    HDU.EX_MEM_memRead  :=  EX_MEM_pipe.control.memRead
+    HDU.ID_EX_branch    :=  ID_EX_pipe.control.branch
+    HDU.ID_EX_rd        :=  ID_EX_pipe.wr_a
+    HDU.EX_MEM_rd       :=  ID_EX_pipe.wr_a
+    HDU.ID_rs1          :=  IF_ID_pipe.instruction(19, 15)
+    HDU.ID_rs2          :=  IF_ID_pipe.instruction(24, 20)
+    HDU.dmemRespValid   :=  io.dmemRsp.valid
+    HDU.branchTaken     :=  ID_stage.id_ex.branchTaken
+    HDU.jump            :=  ID_stage.id_ex.control.jump
+    HDU.branch          :=  ID_stage.id_ex.control.branch
+
+    dontTouch(HDU.pcWrite)
+
     ID_EX_pipe <> ID_stage.id_ex
+    
+    ID_EX_pipe.control.memWrite := Mux(HDU.ctrlMux && ID_stage.id_ex.instruction =/= "h13".U, ID_stage.id_ex.control.memWrite, 0.B)
+    ID_EX_pipe.control.regWrite := Mux(HDU.ctrlMux && ID_stage.id_ex.instruction =/= "h13".U, ID_stage.id_ex.control.regWrite, 0.B)
+
+    var currentRs1 = ID_stage.id_ex.instruction(19, 15)
+    var currentRs2 = ID_stage.id_ex.instruction(24, 20)
+
+    val ForwarderUnit = Module(new ForwarderUnit).io
+    ForwarderUnit.currentRs1 := currentRs1
+    ForwarderUnit.currentRs2 := currentRs2
+    ForwarderUnit.ID_EX_rd.addr   := ID_EX_pipe.wr_a
+    ForwarderUnit.EX_MEM_rd.addr  := EX_MEM_pipe.wr_a
+    ForwarderUnit.ID_EX_rd.value  := EX_stage.ex_mem.alu_result
+    ForwarderUnit.EX_MEM_rd.value := EX_MEM_pipe.alu_result
+
+    ID_EX_pipe.rd1 := Mux(ForwarderUnit.finalRs1.valid, ForwarderUnit.finalRs1.bits, ID_stage.id_ex.rd1)
+    ID_EX_pipe.rd2 := Mux(ForwarderUnit.finalRs2.valid, ForwarderUnit.finalRs2.bits, ID_stage.id_ex.rd2)
+
 
     // dummies -- to be del when WB comes
     // ID_stage.writeReg := 0.U
@@ -60,15 +102,11 @@ class CoreTop extends Component
 
     /******** Execute Stage ********/
 
-    val EX_stage = Module(new ExecuteStage).io
-
     EX_stage.id_ex  <> ID_EX_pipe //ID_stage.id_ex
 
     EX_MEM_pipe     <> EX_stage.ex_mem
 
     /******** Execute Stage ********/
-
-    val MEM_stage = Module(new MemoryStage).io
 
     MEM_stage.ex_mem <> EX_MEM_pipe //EX_stage.ex_mem
 
