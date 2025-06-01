@@ -20,6 +20,7 @@ class ID_EX(dw: Int, mw: Int) extends Bundle
     val f7              : UInt  =   UInt(7.W)
     val f3              : UInt  =   UInt(3.W)
     val instruction     : UInt  =   UInt(32.W)
+    val branchTaken     : Bool  =   Bool()
     val control                 = new ControlSignals
 }
 
