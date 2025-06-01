@@ -11,4 +11,6 @@ object Utils
         }
     }
 
+    def isZero(victim: UInt) = victim === 0.U
+
 }
