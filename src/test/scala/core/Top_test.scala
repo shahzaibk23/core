@@ -7,7 +7,7 @@ import org.scalatest.matchers.must.Matchers
 import svsim.verilator._
 import chisel3.simulator._
 
-import configs.BaseConfig
+import configs.{CoreConfig, SingleCoreWithTracer}
 
 class Top_test extends AnyFreeSpec with Matchers with ChiselSim
 {
@@ -20,14 +20,14 @@ class Top_test extends AnyFreeSpec with Matchers with ChiselSim
         )
 
     implicit val vaerilator = verilatorWithWaves
-    implicit val config: BaseConfig = BaseConfig()
+    implicit val config: CoreConfig = SingleCoreWithTracer()
 
     "Top under test" in
     {
         simulate(new Top)
         {
             dut =>
-                dut.clock.step(50)
+                dut.clock.step(500)
         }
     }
 }
