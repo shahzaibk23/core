@@ -3,13 +3,15 @@ package core
 import chisel3._
 import chisel3.util._
 
-import common.{Component, MemRequestIO, MemResponseIO}
+import common.{Component, ComponentIO, MemRequestIO, MemResponseIO}
 
 import pipeline.{InstructionFetchStage, InstructionDecodeStage, ExecuteStage, MemoryStage, IF_ID, ID_EX, EX_MEM, MEM_WB, HazardDetectionUnit, ForwarderUnit}
 
+import uncore.{Tracer, TracerI, delays}
+
 import components.MemToReg._
 
-class CoreTop_IO(dw:Int, mw:Int) extends Bundle
+class CoreTop_IO extends ComponentIO
 {
     val stall:  Bool   =   Input(Bool())
 
@@ -20,6 +22,8 @@ class CoreTop_IO(dw:Int, mw:Int) extends Bundle
 
     val dmemReq: DecoupledIO[MemRequestIO]  =   Decoupled(new MemRequestIO(dw, mw))
     val dmemRsp: DecoupledIO[MemResponseIO] =   Flipped(Decoupled(new MemResponseIO(dw)))
+
+    val rvfi: Option[TracerI]   = if (config.hasTracer) Some(Flipped(new TracerI)) else None
 }
 
 class CoreTop extends Component
@@ -27,7 +31,7 @@ class CoreTop extends Component
     val dataWidth: Int = config.ISA
     val imemWidth: Int = log2Ceil(config.ImemSize)
 
-    val io = IO(new CoreTop_IO(dataWidth, imemWidth))
+    val io = IO(new CoreTop_IO)
 
     val IF_ID_pipe  =   Reg(new IF_ID(imemWidth))
     val ID_EX_pipe  =   Reg(new ID_EX(dataWidth, imemWidth))
@@ -83,7 +87,7 @@ class CoreTop extends Component
     var currentRs1 = ID_stage.id_ex.instruction(19, 15)
     var currentRs2 = ID_stage.id_ex.instruction(24, 20)
 
-    val ForwarderUnit = Module(new ForwarderUnit).io
+    val ForwarderUnit = Module(new ForwarderUnit).io // TODO: may need to shift it to exe stage, to avoid critical path
     ForwarderUnit.currentRs1 := currentRs1
     ForwarderUnit.currentRs2 := currentRs2
     ForwarderUnit.ID_EX_rd.addr   := ID_EX_pipe.wr_a
@@ -126,4 +130,49 @@ class CoreTop extends Component
 
 
     io.pin := MEM_WB_pipe.alu_result
+
+    /******** RVFI Pins ********/
+
+    if(config.hasTracer)
+    {
+        io.rvfi.get.bool := (MEM_WB_pipe.instruction =/= 0.U) && !clock.asBool
+        io.rvfi.get.uint2 := 3.U
+        io.rvfi.get.uint4 := delays(1, MEM_stage.core_out.dccmReq.bits.activeByteLane)
+
+        var rd_addr_vec = Vector(
+            ID_EX_pipe.rd1,
+            ID_EX_pipe.rd2,
+            ID_stage.id_ex.wr_a
+        )
+        Vector(3, 3, 0).zipWithIndex.foreach(
+            r => io.rvfi.get.uint5(r._2) := delays(r._1, rd_addr_vec(r._2))
+        )
+
+        Vector(
+            MEM_WB_pipe.instruction,
+            delays(2, ID_EX_pipe.rd1),
+            delays(1, ID_EX_pipe.rd2),
+            ID_stage.writeData,
+            MEM_WB_pipe.pc,
+            delays(4, Mux(ID_stage.npc.valid, ID_stage.npc.bits, ID_stage.id_ex.pc + 4.U)),
+            Mux(
+                delays(1, MEM_stage.core_out.dccmReq.valid).asBool,
+                delays(1, EX_MEM_pipe.alu_result),
+                0.U
+            ),
+            Mux(
+                delays(1, EX_MEM_pipe.control.memRead).asBool,
+                MEM_WB_pipe.wr_a,
+                0.U
+            ),
+            Mux(
+                delays(1, EX_MEM_pipe.control.memWrite).asBool,
+                delays(1, MEM_stage.core_out.dccmReq.bits.dataRequest),
+                0.U
+            )
+        ).zipWithIndex.foreach(
+            r => io.rvfi.get.uint32(r._2) := r._1
+        )
+    }
+
 }
