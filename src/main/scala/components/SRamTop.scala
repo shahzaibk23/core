@@ -109,8 +109,8 @@ class SRamTopDuo(programFile: Option[String]) extends Component
     fileOut1.close()
 
 
-    val sram_0    = Module(new sram_top(Some("/Users/shahzaibkashif/core/sram_0.hex"))) // TODO: Find a way to provide absolute path
-    val sram_1    = Module(new sram_top(Some("/Users/shahzaibkashif/core/sram_1.hex")))
+    val sram_0    = Module(new sram_top(Some("/home/hellcaster/core/sram_0.hex"))) // TODO: Find a way to provide absolute path
+    val sram_1    = Module(new sram_top(Some("/home/hellcaster/core/sram_1.hex")))
 
     val clk       = WireInit(clock)
     val rst       = Wire(Bool())
@@ -183,7 +183,7 @@ class SRAM_IO extends Bundle
     val csb_i = Input(Bool())
     val we_i = Input(Bool())
     val wmask_i = Input(UInt(4.W))
-    val addr_i = Input(UInt(13.W))
+    val addr_i = Input(UInt(16.W))
     val wdata_i = Input(UInt(32.W))
     val rdata_o = Output(UInt(32.W))
 }
