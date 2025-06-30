@@ -10,6 +10,8 @@ class MemoryStage_CoreTop_IO(dw: Int, mw: Int) extends Bundle
 {
     val dccmReq:    DecoupledIO[MemRequestIO]   =   Decoupled(new MemRequestIO(dw, mw))
     val dccmRsp:    DecoupledIO[MemResponseIO]  =   Flipped(Decoupled(new MemResponseIO(dw)))
+
+    val unfilteredDccmReq_address: UInt = Output(UInt(mw.W))
 }
 
 class MemoryStage_IO(dw: Int, mw: Int) extends Bundle
@@ -35,9 +37,11 @@ class MemoryStage extends Component
 
     io.core_out.dccmReq.bits.activeByteLane := "b1111".U // TODO: make all variants: half word, word, double word
     io.core_out.dccmReq.bits.dataRequest    := io.ex_mem.write_data
-    io.core_out.dccmReq.bits.addrRequest    := io.ex_mem.alu_result(imemWidth-1, 0) >> 2
+    io.core_out.dccmReq.bits.addrRequest    := (io.ex_mem.alu_result(imemWidth-1, 0) & "h00001fff".U) >> 2
     io.core_out.dccmReq.bits.isWrite        := io.ex_mem.control.memWrite
     io.core_out.dccmReq.valid               := Mux(io.ex_mem.control.memWrite | io.ex_mem.control.memRead, 1.B, 0.B)
+
+    io.core_out.unfilteredDccmReq_address  := io.core_out.dccmReq.bits.addrRequest
 
     io.stall := (io.ex_mem.control.memWrite || io.ex_mem.control.memRead) && !io.core_out.dccmRsp.valid
 
