@@ -11,7 +11,14 @@ import uncore.{Tracer, TracerI, delays}
 
 import components.MemToReg._
 
-class CoreTop_IO extends ComponentIO
+trait SignatureDump extends ComponentIO
+{
+    val dccm_we = Output(Bool())
+    val dccm_addr = Output(UInt(mw.W))
+    val dccm_data = Output(UInt(dw.W))
+}
+
+class CoreTop_IO extends ComponentIO with SignatureDump
 {
     val stall:  Bool   =   Input(Bool())
 
@@ -24,6 +31,8 @@ class CoreTop_IO extends ComponentIO
     val dmemRsp: DecoupledIO[MemResponseIO] =   Flipped(Decoupled(new MemResponseIO(dw)))
 
     val rvfi: Option[TracerI]   = if (config.hasTracer) Some(Flipped(new TracerI)) else None
+
+    // val done: Bool = Output(Bool())
 }
 
 class CoreTop extends Component
@@ -133,9 +142,13 @@ class CoreTop extends Component
 
     /******** RVFI Pins ********/
 
+    io.dccm_we := MEM_stage.core_out.dccmReq.valid && MEM_stage.core_out.dccmReq.bits.isWrite
+    io.dccm_addr := MEM_stage.core_out.unfilteredDccmReq_address
+    io.dccm_data := MEM_stage.core_out.dccmReq.bits.dataRequest
+
     if(config.hasTracer)
     {
-        io.rvfi.get.bool := (MEM_WB_pipe.instruction =/= 0.U) && !clock.asBool
+        io.rvfi.get.bool := (MEM_WB_pipe.instruction =/= 0.U) //&& !clock.asBool
         io.rvfi.get.uint2 := 3.U
         io.rvfi.get.uint4 := delays(1, MEM_stage.core_out.dccmReq.bits.activeByteLane)
 
