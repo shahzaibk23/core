@@ -3,7 +3,7 @@ package configs
 trait CoreConfig
 {
     val ISA     : Int = 64
-    val ImemSize: Int = 1024 // 1KB -- in bytes
+    val ImemSize: Int = 65536 // 64kb xx 16KB -- in bytes
     val XLEN:     Int = ISA
 
     val hasTracer: Boolean = false
